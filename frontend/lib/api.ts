@@ -117,6 +117,70 @@ export const ApiService = {
     }
   },
 
+  async login(email: string, password: string): Promise<{ access_token: string; user: any }> {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Login failed' }));
+      throw new Error(err.detail || 'Login failed');
+    }
+    return res.json();
+  },
+
+  async register(email: string, password: string, full_name?: string): Promise<{ access_token: string; user: any }> {
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, full_name }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Registration failed' }));
+      throw new Error(err.detail || 'Registration failed');
+    }
+    return res.json();
+  },
+
+  async getMe(): Promise<any> {
+    const res = await fetch(`${API_BASE}/auth/me`, {
+      headers: { ...getAuthHeader() },
+    });
+    if (!res.ok) {
+      throw new Error('Failed to get current user');
+    }
+    return res.json();
+  },
+
+  async getUserPortfolios(): Promise<Portfolio[]> {
+    try {
+      const res = await fetch(`${API_BASE}/portfolio`, {
+        headers: { ...getAuthHeader() },
+      });
+      if (!res.ok) {
+        throw new Error(`Fetch portfolios failed status ${res.status}`);
+      }
+      return await res.json();
+    } catch (err) {
+      console.warn('[API] Fetch user portfolios backend offline', err);
+      return [];
+    }
+  },
+
+  async deletePortfolio(id: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/portfolio/${id}`, {
+        method: 'DELETE',
+        headers: { ...getAuthHeader() },
+      });
+      return res.ok;
+    } catch (err) {
+      console.warn('[API] Delete portfolio backend offline', err);
+      return false;
+    }
+  },
+
   async updatePortfolio(id: string, updates: Partial<Portfolio>): Promise<Portfolio> {
     try {
       const res = await fetch(`${API_BASE}/portfolio/${id}`, {

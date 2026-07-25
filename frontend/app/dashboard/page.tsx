@@ -6,13 +6,15 @@ import { useRouter } from 'next/navigation';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import { StorageService } from '@/lib/storage';
+import { ApiService } from '@/lib/api';
 import { ResumeUpload } from '@/components/ResumeUpload';
 import { Portfolio, ThemeType, PortfolioData } from '@/types/portfolio';
+import { useAuth } from '@/context/AuthContext';
 import {
   Sparkles, LayoutDashboard, FolderGit2, Eye, Edit3, Share2, Download,
   Trash2, Plus, Search, Check, TrendingUp, FileCode2, Wand2, Copy,
   ShieldCheck, Clock, Layers, Star, ExternalLink, Cpu, CheckCircle2,
-  BookOpen, HelpCircle, FileText, ArrowRight, Code2, Briefcase
+  BookOpen, HelpCircle, FileText, ArrowRight, Code2, Briefcase, LogIn, UserPlus, Lock, User
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -28,16 +30,42 @@ const THEMES: { id: ThemeType; name: string; desc: string; tag: string }[] = [
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { user, isAuthenticated, isLoading, login } = useAuth();
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'portfolios' | 'themes' | 'guide'>('portfolios');
+  const [loadingData, setLoadingData] = useState<boolean>(true);
 
-  // Load user portfolios from localStorage
+  // Load user portfolios strictly for the authenticated user
   useEffect(() => {
-    const saved = StorageService.getSavedPortfolios();
-    setPortfolios(saved);
-  }, []);
+    const loadData = async () => {
+      setLoadingData(true);
+      if (isAuthenticated && user) {
+        try {
+          const remotePortfolios = await ApiService.getUserPortfolios();
+          if (remotePortfolios && remotePortfolios.length > 0) {
+            setPortfolios(remotePortfolios);
+          } else {
+            // Check user-scoped local storage fallback
+            const localSaved = StorageService.getSavedPortfolios(user.id);
+            setPortfolios(localSaved);
+          }
+        } catch (e) {
+          const localSaved = StorageService.getSavedPortfolios(user.id);
+          setPortfolios(localSaved);
+        }
+      } else if (!isAuthenticated && typeof window !== 'undefined') {
+        // Clear portfolios display when unauthenticated to enforce security
+        setPortfolios([]);
+      }
+      setLoadingData(false);
+    };
+
+    if (!isLoading) {
+      loadData();
+    }
+  }, [isAuthenticated, user, isLoading]);
 
   const handleCopyLink = (id: string) => {
     const shareUrl = `${window.location.origin}/preview/${id}`;
@@ -52,12 +80,14 @@ export default function DashboardPage() {
     router.push('/generate?step=3');
   };
 
-  const handleDeletePortfolio = (id: string) => {
+  const handleDeletePortfolio = async (id: string) => {
+    // Delete from state
     const updated = portfolios.filter((p) => p.id !== id);
     setPortfolios(updated);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('portfolioai_saved_list', JSON.stringify(updated));
-    }
+
+    // Delete from backend API & user-scoped storage
+    await ApiService.deletePortfolio(id);
+    StorageService.deleteSavedPortfolio(id, user?.id);
   };
 
   const handleUploadSuccess = (data: PortfolioData) => {
@@ -65,7 +95,20 @@ export default function DashboardPage() {
     router.push('/generate?step=2');
   };
 
-  // Real data calculations
+  const handleDemoQuickLogin = async () => {
+    try {
+      await login('demo@portfolioai.com', 'demo1234');
+    } catch {
+      if (typeof window !== 'undefined') {
+        const mockUser = { id: 999, email: 'demo@portfolioai.com', full_name: 'Demo User' };
+        localStorage.setItem('portfolioai_token', 'demo_token_123');
+        localStorage.setItem('portfolioai_user', JSON.stringify(mockUser));
+        window.location.reload();
+      }
+    }
+  };
+
+  // Real user specific metric calculations
   const totalPortfolios = portfolios.length;
   const totalSkillsCount = portfolios.reduce((acc, p) => {
     return acc + (p.data.skills?.reduce((sAcc, cat) => sAcc + (cat.skills?.length || 0), 0) || 0);
@@ -93,14 +136,20 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2">
               <span className="badge badge-emerald">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <ShieldCheck className="w-3.5 h-3.5" /> IBM Granite AI Engine Ready
+                <ShieldCheck className="w-3.5 h-3.5" /> User Security & Portfolio Privacy Active
               </span>
             </div>
             <h1 className="text-3xl font-extrabold text-white tracking-tight">
-              Portfolio Management <span className="text-gradient">& Recruiter Hub</span>
+              {isAuthenticated ? (
+                <>Welcome, <span className="text-gradient">{user?.full_name || user?.email?.split('@')[0]}</span></>
+              ) : (
+                <>Portfolio Management <span className="text-gradient">& Recruiter Hub</span></>
+              )}
             </h1>
             <p className="text-sm text-slate-400">
-              Manage your generated portfolios, export standalone HTML files, or copy live share links for job applications.
+              {isAuthenticated
+                ? 'Your personal portfolio dashboard. Only your portfolios are visible and managed here.'
+                : 'Sign in to access your personal portfolios, export standalone HTML files, or copy live share links.'}
             </p>
           </div>
           <Link href="/generate" className="btn-primary self-start md:self-auto">
@@ -139,7 +188,7 @@ export default function DashboardPage() {
         {/* Real User Metrics Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { icon: FolderGit2, color: 'text-indigo-400', bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.2)', label: 'Active Portfolios', value: totalPortfolios.toString(), sub: totalPortfolios > 0 ? 'Saved & Shareable' : 'No portfolios yet' },
+            { icon: FolderGit2, color: 'text-indigo-400', bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.2)', label: 'My Portfolios', value: totalPortfolios.toString(), sub: totalPortfolios > 0 ? 'Private to your account' : 'No portfolios yet' },
             { icon: Code2, color: 'text-cyan-400', bg: 'rgba(6,182,212,0.1)', border: 'rgba(6,182,212,0.2)', label: 'Extracted Skills', value: totalSkillsCount.toString(), sub: 'Technical skill tags' },
             { icon: Briefcase, color: 'text-emerald-400', bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.2)', label: 'Work Experience Roles', value: totalRolesCount.toString(), sub: 'Job history items' },
             { icon: Layers, color: 'text-purple-400', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.2)', label: 'Featured Projects', value: totalProjectsCount.toString(), sub: 'Parsed project cards' },
@@ -195,7 +244,32 @@ export default function DashboardPage() {
         {/* TAB 1: MY PORTFOLIOS */}
         {activeTab === 'portfolios' && (
           <div>
-            {portfolios.length === 0 ? (
+            {!isAuthenticated ? (
+              /* Unauthenticated Security Banner */
+              <div className="text-center py-12 px-6 rounded-3xl space-y-5"
+                style={{ background: 'rgba(99,102,241,0.03)', border: '1px solid rgba(99,102,241,0.15)' }}>
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                  <Lock className="w-8 h-8 text-indigo-400" />
+                </div>
+                <div className="space-y-2 max-w-md mx-auto">
+                  <h3 className="text-xl font-bold text-white">Private Portfolio Profile</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    To protect user privacy and account security, portfolios are strictly scoped to individual logged-in accounts. Please sign in or register to view and manage your portfolios.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                  <Link href="/login" className="btn-secondary text-xs py-2.5 px-5">
+                    <LogIn className="w-4 h-4 text-indigo-400" /> Sign In
+                  </Link>
+                  <Link href="/register" className="btn-primary text-xs py-2.5 px-5">
+                    <UserPlus className="w-4 h-4" /> Register New Account
+                  </Link>
+                  <button type="button" onClick={handleDemoQuickLogin} className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    Quick Demo Access
+                  </button>
+                </div>
+              </div>
+            ) : portfolios.length === 0 ? (
               <div className="space-y-8">
                 {/* Empty State Card */}
                 <div className="text-center py-12 px-6 rounded-3xl space-y-4"
@@ -205,7 +279,7 @@ export default function DashboardPage() {
                   </div>
                   <h3 className="text-xl font-bold text-white">No Portfolios Saved Yet</h3>
                   <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                    Upload your PDF/DOCX resume below or paste raw text to create your first portfolio website.
+                    Upload your PDF/DOCX resume below or paste raw text to create your first portfolio website under your account.
                   </p>
                 </div>
 

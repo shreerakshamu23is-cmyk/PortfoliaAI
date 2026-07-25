@@ -53,10 +53,11 @@ export const StorageService = {
     }
   },
 
-  savePortfolioToHistory(portfolio: Portfolio): void {
+  savePortfolioToHistory(portfolio: Portfolio, userId?: string | number): void {
     if (typeof window === 'undefined') return;
     try {
-      const existingStr = localStorage.getItem(SAVED_PORTFOLIOS_KEY);
+      const storageKey = userId ? `${SAVED_PORTFOLIOS_KEY}_${userId}` : SAVED_PORTFOLIOS_KEY;
+      const existingStr = localStorage.getItem(storageKey);
       const list: Portfolio[] = existingStr ? JSON.parse(existingStr) : [];
       const index = list.findIndex(p => p.id === portfolio.id);
       if (index >= 0) {
@@ -64,20 +65,37 @@ export const StorageService = {
       } else {
         list.unshift(portfolio);
       }
-      localStorage.setItem(SAVED_PORTFOLIOS_KEY, JSON.stringify(list));
+      localStorage.setItem(storageKey, JSON.stringify(list));
       localStorage.setItem(`portfolio_${portfolio.id}`, JSON.stringify(portfolio));
     } catch (e) {
       console.error('Error saving portfolio to history', e);
     }
   },
 
-  getSavedPortfolios(): Portfolio[] {
+  getSavedPortfolios(userId?: string | number): Portfolio[] {
     if (typeof window === 'undefined') return [];
     try {
-      const str = localStorage.getItem(SAVED_PORTFOLIOS_KEY);
+      const storageKey = userId ? `${SAVED_PORTFOLIOS_KEY}_${userId}` : SAVED_PORTFOLIOS_KEY;
+      const str = localStorage.getItem(storageKey);
       return str ? JSON.parse(str) : [];
     } catch {
       return [];
+    }
+  },
+
+  deleteSavedPortfolio(id: string, userId?: string | number): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const storageKey = userId ? `${SAVED_PORTFOLIOS_KEY}_${userId}` : SAVED_PORTFOLIOS_KEY;
+      const existingStr = localStorage.getItem(storageKey);
+      if (existingStr) {
+        const list: Portfolio[] = JSON.parse(existingStr);
+        const updated = list.filter(p => p.id !== id);
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+      }
+      localStorage.removeItem(`portfolio_${id}`);
+    } catch (e) {
+      console.error('Error deleting portfolio from history', e);
     }
   }
 };

@@ -52,6 +52,16 @@ def get_current_user_optional(token: Optional[str] = Depends(oauth2_scheme), db:
     user = db.query(User).filter(User.email == email).first()
     return user
 
+def get_current_user_required(user: Optional[User] = Depends(get_current_user_optional)) -> User:
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication credentials were not provided or are invalid",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+
 @router.post("/register", response_model=Token)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == user_in.email).first()

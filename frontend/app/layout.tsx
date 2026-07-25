@@ -26,6 +26,8 @@ export const metadata: Metadata = {
   keywords: ['PortfolioAI', 'AI Portfolio Generator', 'IBM Granite', 'watsonx.ai', 'Resume to Portfolio', 'Developer Portfolio'],
 };
 
+import { AuthProvider } from '@/context/AuthContext';
+
 export default function RootLayout({
   children,
 }: {
@@ -34,7 +36,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${mono.variable} ${serif.variable} dark`}>
       <body className="bg-[#030712] text-slate-100 min-h-screen antialiased font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

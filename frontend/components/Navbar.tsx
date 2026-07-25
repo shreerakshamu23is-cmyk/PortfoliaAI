@@ -1,10 +1,9 @@
-'use client';
-
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Sparkles, Wand2, LayoutDashboard, Menu, X, ArrowLeft, Home } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Sparkles, Wand2, LayoutDashboard, Menu, X, ArrowLeft, Home, LogIn, LogOut, User, UserPlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/context/AuthContext';
 
 interface NavbarProps {
   currentStep?: number;
@@ -13,6 +12,13 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ currentStep }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isAuthenticated, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    router.push('/');
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/[0.06]" style={{ background: 'rgba(10,15,30,0.85)', backdropFilter: 'blur(20px)' }}>
@@ -78,17 +84,55 @@ export const Navbar: React.FC<NavbarProps> = ({ currentStep }) => {
 
         {/* Right Actions */}
         <div className="flex items-center gap-3">
-          {currentStep === undefined && (
-            <Link href="/dashboard" className="hidden sm:flex items-center gap-1.5 btn-secondary text-sm py-2 px-3">
-              <LayoutDashboard className="w-4 h-4 text-indigo-400" />
-              Dashboard
-            </Link>
+          {isAuthenticated ? (
+            <div className="flex items-center gap-2">
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-200 hover:text-white transition-all"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+              >
+                <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-[11px] font-bold text-white uppercase">
+                  {user?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+                </div>
+                <span className="hidden sm:inline line-clamp-1 max-w-[100px]">
+                  {user?.full_name || user?.email?.split('@')[0]}
+                </span>
+              </Link>
+              <button
+                type="button"
+                onClick={handleLogout}
+                title="Sign Out"
+                className="p-2 rounded-xl text-slate-400 hover:text-red-400 transition-colors"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="hidden sm:flex items-center gap-2">
+              <Link
+                href="/login"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-all"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <LogIn className="w-3.5 h-3.5 text-indigo-400" /> Sign In
+              </Link>
+              <Link
+                href="/register"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-white transition-all"
+                style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
+              >
+                <UserPlus className="w-3.5 h-3.5" /> Sign Up
+              </Link>
+            </div>
           )}
-          <Link href="/generate" className="btn-primary">
-            <Wand2 className="w-4 h-4" />
+
+          <Link href="/generate" className="btn-primary py-1.5 px-3.5 text-xs">
+            <Wand2 className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Create Portfolio</span>
             <span className="sm:hidden">Create</span>
           </Link>
+
           <button
             type="button"
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -110,27 +154,32 @@ export const Navbar: React.FC<NavbarProps> = ({ currentStep }) => {
             className="md:hidden overflow-hidden border-t border-white/[0.06]"
             style={{ background: 'rgba(10,15,30,0.95)' }}
           >
-            <div className="px-4 py-5 space-y-1">
-              <Link href="/" onClick={() => setMobileOpen(false)} className="flex items-center px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/[0.05] transition-all">
+            <div className="px-4 py-5 space-y-2">
+              <Link href="/" onClick={() => setMobileOpen(false)} className="flex items-center px-3 py-2 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/[0.05] transition-all">
                 <Home className="w-4 h-4 mr-2" /> Home Page
               </Link>
-              <Link href="/#features" onClick={() => setMobileOpen(false)} className="flex items-center px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/[0.05] transition-all">
-                Features
-              </Link>
-              <Link href="/#how-it-works" onClick={() => setMobileOpen(false)} className="flex items-center px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/[0.05] transition-all">
-                How it works
-              </Link>
-              <Link href="/#themes" onClick={() => setMobileOpen(false)} className="flex items-center px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/[0.05] transition-all">
-                7 Themes
-              </Link>
-              <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center px-3 py-2.5 rounded-lg text-sm text-indigo-400 font-medium hover:bg-white/[0.05] transition-all">
+              <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center px-3 py-2 rounded-lg text-sm text-indigo-400 font-medium hover:bg-white/[0.05] transition-all">
                 <LayoutDashboard className="w-4 h-4 mr-2" /> Dashboard
               </Link>
-              <div className="pt-2">
-                <Link href="/generate" onClick={() => setMobileOpen(false)} className="btn-primary w-full justify-center">
-                  <Wand2 className="w-4 h-4" /> Create Portfolio
-                </Link>
-              </div>
+              {!isAuthenticated && (
+                <div className="flex gap-2 pt-2">
+                  <Link href="/login" onClick={() => setMobileOpen(false)} className="flex-1 btn-secondary text-xs justify-center py-2">
+                    <LogIn className="w-3.5 h-3.5 text-indigo-400" /> Sign In
+                  </Link>
+                  <Link href="/register" onClick={() => setMobileOpen(false)} className="flex-1 btn-primary text-xs justify-center py-2">
+                    <UserPlus className="w-3.5 h-3.5" /> Sign Up
+                  </Link>
+                </div>
+              )}
+              {isAuthenticated && (
+                <button
+                  type="button"
+                  onClick={() => { setMobileOpen(false); handleLogout(); }}
+                  className="flex items-center w-full px-3 py-2 rounded-lg text-sm text-red-400 hover:bg-red-500/10 transition-all"
+                >
+                  <LogOut className="w-4 h-4 mr-2" /> Sign Out ({user?.full_name || user?.email})
+                </button>
+              )}
             </div>
           </motion.div>
         )}

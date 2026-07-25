@@ -14,7 +14,7 @@ from app.models.user import User
 from app.schemas.portfolio import (
     PortfolioCreate, PortfolioUpdate, PortfolioResponse, PortfolioData
 )
-from app.routers.auth import get_current_user_optional
+from app.routers.auth import get_current_user_optional, get_current_user_required
 from app.services.theme_generator import ThemeGeneratorService
 from app.services.portfolio_generator import PortfolioGeneratorService
 
@@ -24,6 +24,19 @@ router = APIRouter(prefix="/portfolio", tags=["Portfolio"])
 def get_themes():
     """Return all available portfolio themes."""
     return ThemeGeneratorService.get_all_themes()
+
+@router.get("", response_model=List[PortfolioResponse])
+@router.get("/", response_model=List[PortfolioResponse])
+@router.get("/my", response_model=List[PortfolioResponse])
+def get_user_portfolios(
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Fetch portfolios owned by current authenticated user."""
+    if not current_user:
+        return []
+    portfolios = db.query(Portfolio).filter(Portfolio.user_id == current_user.id).order_by(Portfolio.created_at.desc()).all()
+    return portfolios
 
 @router.post("", response_model=PortfolioResponse)
 @router.post("/", response_model=PortfolioResponse)
@@ -69,6 +82,9 @@ def update_portfolio(
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
 
+    if current_user and portfolio.user_id and portfolio.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not have permission to update this portfolio")
+
     if payload.title:
         portfolio.title = payload.title
     if payload.theme:
@@ -81,6 +97,24 @@ def update_portfolio(
     db.commit()
     db.refresh(portfolio)
     return portfolio
+
+@router.delete("/{portfolio_id}")
+def delete_portfolio(
+    portfolio_id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Delete portfolio by ID."""
+    portfolio = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
+    if current_user and portfolio.user_id and portfolio.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not have permission to delete this portfolio")
+
+    db.delete(portfolio)
+    db.commit()
+    return {"message": "Portfolio deleted successfully", "id": portfolio_id}
 
 @router.post("/{portfolio_id}/export")
 def export_portfolio_html(
@@ -99,3 +133,4 @@ def export_portfolio_html(
         content=html_content,
         headers={"Content-Disposition": f"attachment; filename=portfolio_{portfolio_id}.html"}
     )
+

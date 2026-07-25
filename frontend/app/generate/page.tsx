@@ -11,6 +11,7 @@ import { PortfolioPreview } from '@/components/PortfolioPreview';
 import { StorageService } from '@/lib/storage';
 import { ApiService } from '@/lib/api';
 import { PortfolioData, ThemeType, Portfolio } from '@/types/portfolio';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles, ArrowLeft, Download, Share2, Eye, Edit3, Check, Wand2, ArrowRight, Copy, ExternalLink, ShieldCheck, Loader2 } from 'lucide-react';
@@ -58,13 +59,15 @@ function GenerateStudioContent() {
     StorageService.saveDraftTheme(newTheme);
   };
 
+  const { user } = useAuth();
+
   const handleSaveAndPublish = async () => {
     if (!portfolioData) return;
     setIsSaving(true);
     try {
       const created = await ApiService.createPortfolio(portfolioData, theme);
       setSavedPortfolio(created);
-      StorageService.savePortfolioToHistory(created);
+      StorageService.savePortfolioToHistory(created, user?.id);
       setStep(4);
     } catch (err) {
       console.error(err);
