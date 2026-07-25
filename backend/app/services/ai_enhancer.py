@@ -205,8 +205,14 @@ Format JSON as follows (return empty lists [] for any missing sections):
         linkedin = linkedin_match.group(0) if linkedin_match else ""
         linkedin_handle = linkedin_match.group(3) if linkedin_match else ""
 
-        # 2. Extract Name (Ignore section header keywords, font specs, title fragments, and PDF tags)
-        header_keywords = {"profile", "resume", "curriculum vitae", "cv", "contact", "summary", "education", "skills", "experience", "projects", "certifications", "internships", "objective", "software engineer & technology specialist", "arial,bold", "timesnewroman", "helvetica", "final"}
+        # 2. Extract Name (Ignore section header keywords, font specs, title fragments, and personal metadata labels)
+        header_keywords = {
+            "profile", "resume", "curriculum vitae", "cv", "contact", "summary", "education", "skills", 
+            "experience", "projects", "certifications", "internships", "objective", "hobbies", "declaration",
+            "software engineer & technology specialist", "arial,bold", "timesnewroman", "helvetica", "final",
+            "father name", "mother name", "date of birth", "dob", "sex", "gender", "nationality", 
+            "permanent address", "address", "personal details", "personal profile", "information", "details"
+        }
         name = ""
 
         # Check extracted /Title annotation first if present in text
@@ -217,10 +223,17 @@ Format JSON as follows (return empty lists [] for any missing sections):
                 name = candidate_anno
 
         if not name:
-            for line in lines[:10]:
+            for line in lines[:30]:
                 clean_line = line.strip()
                 if clean_line.startswith("%") or "\ufffd" in clean_line or clean_line.startswith("/") or "http" in clean_line:
                     continue
+
+                # Skip lines containing personal labels like "Father Name :", "Mother Name :", "Permanent Address :"
+                if ":" in clean_line:
+                    prefix = clean_line.split(":")[0].strip().lower()
+                    if prefix in header_keywords or any(kw in prefix for kw in ["father", "mother", "birth", "dob", "sex", "gender", "nationality", "address", "phone", "email", "linkedin", "contact", "hobbies"]):
+                        continue
+
                 # Split line if it combines name with pipe/dash, e.g. "Alex Devlin | Senior Full-Stack Engineer"
                 name_parts = re.split(r"\s+[|•·@–—]\s+|\s+-\s+", clean_line)
                 candidate_part = name_parts[0].strip()
@@ -228,9 +241,23 @@ Format JSON as follows (return empty lists [] for any missing sections):
 
                 if candidate_lower not in header_keywords and not re.search(r"[@\dhttp:]", candidate_part) and 2 <= len(candidate_part) <= 45:
                     clean_name = re.sub(r"^[-•*▸▪\d\.\s]+", "", candidate_part).strip()
-                    if clean_name and not any(kw in clean_name.lower() for kw in ["resume", "curriculum vitae", "summary", "contact", "arial", "bold", "final"]):
-                        name = clean_name
-                        break
+                    if clean_name and not any(kw in clean_name.lower() for kw in ["resume", "curriculum vitae", "summary", "contact", "arial", "bold", "final", "father", "mother", "address", "hobbies", "sex", "nationality"]):
+                        # Check if it looks like a clean name (1-4 alphabetic words)
+                        if re.match(r"^[A-Za-z\s\.\'-]{2,40}$", clean_name):
+                            name = clean_name
+                            break
+
+        # Fallback to standalone name search in lines if name is still missing or default
+        if not name or name.lower() in header_keywords:
+            for line in lines[:30]:
+                clean_line = line.strip()
+                if ":" in clean_line or "@" in clean_line or re.search(r"\d", clean_line):
+                    continue
+                if clean_line.lower() in header_keywords:
+                    continue
+                if re.match(r"^[A-Z][a-zA-Za-z\s\.\'-]{2,35}$", clean_line):
+                    name = clean_line
+                    break
 
         # Fallback to LinkedIn handle or email username if name is invalid or missing
         if not name or name.startswith("%") or "\ufffd" in name or len(name) > 40 or name.lower() in header_keywords:

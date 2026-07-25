@@ -5,15 +5,35 @@ from pypdf import PdfReader
 import pdfplumber
 import docx
 
+try:
+    import pytesseract
+    from PIL import Image
+    TESSERACT_AVAILABLE = True
+except ImportError:
+    TESSERACT_AVAILABLE = False
+
 class ResumeParserService:
     @staticmethod
     def extract_text_from_pdf(file_bytes: bytes) -> str:
-        """Extract text content from PDF bytes using pdfplumber with pypdf fallback."""
+        """Extract text content from PDF bytes using pdfplumber with Tesseract OCR fallback."""
         text = ""
         try:
             with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
                 for page in pdf.pages:
-                    extracted = page.extract_text()
+                    extracted = page.extract_text(layout=True)
+                    if not extracted:
+                        extracted = page.extract_text()
+                    
+                    # OCR Fallback for scanned image pages
+                    if (not extracted or len(extracted.strip()) < 30) and TESSERACT_AVAILABLE:
+                        try:
+                            p_img = page.to_image(resolution=150).original
+                            ocr_text = pytesseract.image_to_string(p_img)
+                            if ocr_text:
+                                extracted = ocr_text
+                        except Exception as ocr_err:
+                            print(f"[Parser] Page OCR fallback error: {ocr_err}")
+
                     if extracted:
                         text += extracted + "\n"
         except Exception as e:
@@ -28,6 +48,18 @@ class ResumeParserService:
                 raise ValueError(f"Could not parse PDF file: {ex}")
                 
         return text.strip()
+
+    @staticmethod
+    def extract_text_from_image(file_bytes: bytes) -> str:
+        """Extract text content from image bytes (PNG, JPG, JPEG) using pytesseract OCR."""
+        if not TESSERACT_AVAILABLE:
+            raise ValueError("Tesseract OCR is not installed for processing image resumes.")
+        try:
+            image = Image.open(io.BytesIO(file_bytes))
+            text = pytesseract.image_to_string(image)
+            return text.strip()
+        except Exception as e:
+            raise ValueError(f"Could not parse image resume: {e}")
 
     @staticmethod
     def extract_text_from_docx(file_bytes: bytes) -> str:
@@ -115,20 +147,20 @@ class ResumeParserService:
         extracted = ""
         if lower_name.endswith(".pdf"):
             extracted = cls.extract_text_from_pdf(file_bytes)
-            # If extracted text looks like raw PDF source code, sanitize it
             if "%PDF-" in extracted or "/Title" in extracted or "endobj" in extracted:
                 extracted = cls.sanitize_pdf_raw_text(extracted)
+        elif lower_name.endswith((".png", ".jpg", ".jpeg")):
+            extracted = cls.extract_text_from_image(file_bytes)
         elif lower_name.endswith(".docx") or lower_name.endswith(".doc"):
             extracted = cls.extract_text_from_docx(file_bytes)
         elif lower_name.endswith(".txt"):
             extracted = file_bytes.decode("utf-8", errors="ignore")
         else:
-            raise ValueError("Unsupported file format. Please upload a PDF, DOCX, or TXT file.")
+            raise ValueError("Unsupported file format. Please upload a PDF, PNG, JPG, DOCX, or TXT file.")
 
         if "%PDF-" in extracted or "/Title" in extracted or "endobj" in extracted:
             extracted = cls.sanitize_pdf_raw_text(extracted)
 
-        # Strip Wingdings & Private Use Area Unicode bullet symbols (e.g. \uf0d8, \uf0b7, \uf095)
         extracted = re.sub(r'[\uf000-\uf8ff]', '', extracted)
         return extracted.strip()
 
