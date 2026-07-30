@@ -1,26 +1,20 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { ApiService } from '@/lib/api';
-import { StorageService } from '@/lib/storage';
 import { Portfolio } from '@/types/portfolio';
 import { PortfolioRenderer } from '@/components/portfolio/Themes';
-import { Button } from '@/components/ui/button';
-import { Share2, Download, Copy, Check, Sparkles, Loader2, Edit3, ChevronUp, ChevronDown } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { Download, Copy, Check, Loader2, ChevronUp, ChevronDown } from 'lucide-react';
 
 export default function PublicPreviewPage() {
   const params = useParams();
-  const router = useRouter();
   const id = params?.id as string;
-  const { user } = useAuth();
 
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
@@ -29,31 +23,13 @@ export default function PublicPreviewPage() {
       .then((data) => {
         setPortfolio(data);
         setLoading(false);
-
-        // Ownership Verification Check:
-        // Check local storage saved history and owner user id match
-        if (typeof window !== 'undefined') {
-          const localSaved = StorageService.getSavedPortfolios(user?.id);
-          const hasLocalCopy = localStorage.getItem(`portfolio_${id}`);
-          const isSavedInHistory = localSaved.some((p) => p.id === id) || Boolean(hasLocalCopy);
-          const isUserMatch = Boolean(user && data.user_id && Number(data.user_id) === Number(user.id));
-          
-          setIsOwner(isSavedInHistory || isUserMatch);
-        }
       })
       .catch((err) => {
         console.error(err);
         setError('Portfolio not found or unavailable');
         setLoading(false);
       });
-  }, [id, user]);
-
-  const handleEditPortfolio = () => {
-    if (!portfolio) return;
-    StorageService.saveDraftData(portfolio.data);
-    StorageService.saveDraftTheme(portfolio.theme);
-    router.push(`/generate?step=3&theme=${portfolio.theme}`);
-  };
+  }, [id]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -125,18 +101,6 @@ export default function PublicPreviewPage() {
       >
         {!isCollapsed && (
           <>
-            {/* ONLY render "Edit Portfolio" if visitor is verified as the Portfolio Owner */}
-            {isOwner && (
-              <button
-                type="button"
-                onClick={handleEditPortfolio}
-                className="btn-primary text-xs py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5"
-                title="Owner Control: Edit this portfolio"
-              >
-                <Edit3 className="w-3.5 h-3.5" /> Edit Portfolio
-              </button>
-            )}
-
             <button
               type="button"
               onClick={handleCopyLink}
@@ -174,4 +138,5 @@ export default function PublicPreviewPage() {
     </div>
   );
 }
+
 
