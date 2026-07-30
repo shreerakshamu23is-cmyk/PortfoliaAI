@@ -74,7 +74,7 @@ WATSONX_PROJECT_ID="your_ibm_watsonx_project_id"
 WATSONX_URL="https://us-south.ml.cloud.ibm.com"
 GRANITE_MODEL_ID="ibm/granite-3-8b-instruct"
 ```
- AWS DeploymentURL:https://52-201-247-205.sslip.io/
+ AWS DeploymentURL:https://portfoliai.duckdns.org/
 ---
 
 
