@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { ApiService } from '@/lib/api';
 import { Portfolio } from '@/types/portfolio';
 import { PortfolioRenderer } from '@/components/portfolio/Themes';
-import { Download, Copy, Check, Loader2, ChevronUp, ChevronDown } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 export default function PublicPreviewPage() {
   const params = useParams();
@@ -14,8 +14,6 @@ export default function PublicPreviewPage() {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -30,42 +28,6 @@ export default function PublicPreviewPage() {
         setLoading(false);
       });
   }, [id]);
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleExportHTML = () => {
-    if (!portfolio) return;
-    const htmlContent = `<!DOCTYPE html>
-<html lang="en" class="dark">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${portfolio.data.name} — Recruiter Portfolio</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-</head>
-<body class="bg-[#030712] text-slate-100 p-8">
-  <div class="max-w-4xl mx-auto space-y-8">
-    <h1 class="text-5xl font-extrabold text-white">${portfolio.data.name}</h1>
-    <p class="text-xl text-indigo-400 font-semibold">${portfolio.data.title}</p>
-    <p class="text-sm text-slate-300">${portfolio.data.about}</p>
-  </div>
-</body>
-</html>`;
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${portfolio.data.name.replace(/\s+/g, '_')}_Portfolio.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
 
   if (loading) {
     return (
@@ -90,53 +52,11 @@ export default function PublicPreviewPage() {
 
   return (
     <div className="min-h-screen bg-[#030712] relative">
-      {/* Floating Action Header Bar */}
-      <div
-        className="fixed top-4 right-4 z-50 flex items-center gap-2 p-2 rounded-2xl transition-all duration-300 shadow-2xl"
-        style={{
-          background: 'rgba(10,15,30,0.85)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,255,255,0.1)'
-        }}
-      >
-        {!isCollapsed && (
-          <>
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className="btn-secondary text-xs py-1.5 px-3"
-              title="Share portfolio link"
-            >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              {copied ? 'Copied' : 'Share'}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleExportHTML}
-              className="btn-secondary text-xs py-1.5 px-3"
-              title="Download standalone HTML file"
-            >
-              <Download className="w-3.5 h-3.5" /> HTML
-            </button>
-          </>
-        )}
-
-        {/* Minimal Toggle to collapse/expand header bar for pristine viewing */}
-        <button
-          type="button"
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-          title={isCollapsed ? 'Expand toolbar' : 'Minimize toolbar'}
-        >
-          {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-        </button>
-      </div>
-
-      {/* Render Theme */}
+      {/* 100% Clean Portfolio Website View */}
       <PortfolioRenderer data={portfolio.data} theme={portfolio.theme} />
     </div>
   );
 }
+
 
 
